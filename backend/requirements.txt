@@ -4,3 +4,5 @@ python-dotenv
 openai
 httpx
 opencv-python-headless
+python-multipart
+
