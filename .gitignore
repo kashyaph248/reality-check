@@ -1,0 +1,14 @@
+# Backend
+backend/.env
+backend/.venv
+backend/__pycache__/
+backend/.pytest_cache/
+
+# Frontend
+reality-check-web/.env
+reality-check-web/.env.local
+reality-check-web/node_modules
+reality-check-web/.next
+
+# Mac / general
+.DS_Store
