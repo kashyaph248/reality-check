@@ -1,19 +1,22 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import os
 
 from app.routes.verify import router as verify_router
 from app.routes.universal_check import router as universal_router
 
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "")
 
-if ALLOWED_ORIGINS:
-    allowed_origins = [o.strip() for o in ALLOWED_ORIGINS.split(",") if o.strip()]
-else:
-    allowed_origins = ["*"]  # fallback for local dev
+def get_allowed_origins() -> list[str]:
+    raw = os.getenv("ALLOWED_ORIGINS", "")
+    if not raw:
+        return ["*"]
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
 
 app = FastAPI(title="Reality Check API")
 
+# CORS
+allowed_origins = get_allowed_origins()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -42,7 +45,7 @@ async def health():
     }
 
 
-# IMPORTANT: mount routers under /api
-app.include_router(verify_router, prefix="/api")
-app.include_router(universal_router, prefix="/api")
+# IMPORTANT: All API routes live under /api
+app.include_router(verify_router, prefix="/api", tags=["verify"])
+app.include_router(universal_router, prefix="/api", tags=["universal"])
 

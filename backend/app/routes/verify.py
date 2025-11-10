@@ -1,41 +1,42 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 from typing import Optional, List
-from app.services.search import search_web
+
 from app.services.analyzer import analyze_claim
+from app.services.search import search_web
 
 router = APIRouter()
 
 
 class VerifyRequest(BaseModel):
-    text: Optional[str] = None
-    url: Optional[HttpUrl] = None
+    claim: str = ""
+    url: Optional[str] = None
 
 
-class VerifyResponse(BaseModel):
-    verdict: str
-    confidence: float
-    supporting_sources: List[str]
-    contradicting_sources: List[str]
-    reasoning: List[str]
+@router.post("/verify")
+async def verify(payload: VerifyRequest):
+    """
+    Quick factual check for text or a URL.
+    """
+    if not payload.claim and not payload.url:
+        raise HTTPException(status_code=400, detail="No claim or URL provided")
 
+    text = payload.claim or payload.url or ""
+    search_results: List[dict] = []
 
-@router.post("/verify", response_model=VerifyResponse)
-async def verify_content(payload: VerifyRequest):
-    if not payload.text and not payload.url:
-        raise HTTPException(status_code=400, detail="Provide either 'text' or 'url'.")
+    if payload.url:
+        try:
+            search_results = await search_web(payload.url)
+        except Exception as e:
+            print("Search error:", e)
 
-    # Build claim
-    if payload.text:
-        claim = payload.text.strip()
-    else:
-        claim = f"Verify the main factual claims in the content at this URL: {payload.url}"
+    analysis = await analyze_claim(text, search_results)
 
-    # 1. Search web (if configured)
-    search_results = await search_web(claim)
-
-    # 2. Analyze with AI
-    result = analyze_claim(claim, search_results)
-
-    return VerifyResponse(**result)
+    return {
+        "status": "ok",
+        "verdict": analysis.get("verdict", "unclear"),
+        "confidence": analysis.get("confidence", 0.0),
+        "reasoning": analysis.get("reasoning", ""),
+        "sources": analysis.get("sources", []),
+    }
 
