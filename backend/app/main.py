@@ -1,53 +1,61 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-import os
 
-# Load environment variables from .env
+from app.routes.verify import router as verify_router
+from app.routes.universal_check import router as universal_router
+
+# Load .env locally; on Render it reads real env vars
 load_dotenv(override=True)
 
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
 
-def get_allowed_origins() -> list[str]:
-    """
-    Reads ALLOWED_ORIGINS from .env (comma-separated).
-    Defaults to localhost:3000 for development.
-    """
-    raw = os.getenv("ALLOWED_ORIGINS", "").strip()
-    if not raw:
-        return ["http://localhost:3000"]
-    return [o.strip() for o in raw.split(",") if o.strip()]
+allowed_origins_list = [
+    o.strip()
+    for o in ALLOWED_ORIGINS.split(",")
+    if o.strip()
+]
 
-
-# Initialize FastAPI app
 app = FastAPI(
     title="Reality Check API",
     version="1.0.0",
-    description="Backend for Reality Check: claim verification & media analysis",
+    description="Backend for Reality Check: claim, media, and universal verification.",
 )
 
-# CORS configuration
-allowed_origins = get_allowed_origins()
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=allowed_origins_list or ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Import and include routers
-from app.routes.verify import router as verify_router  # noqa: E402
-from app.routes.universal_check import router as universal_router  # noqa: E402
+# --- Meta / Health ---
 
-app.include_router(verify_router, prefix="/api", tags=["verify"])
-app.include_router(universal_router, prefix="/api", tags=["universal"])
-
-
-# Health check route
-@app.get("/api/health")
-def health_check():
+@app.get("/", tags=["meta"])
+async def root():
     return {
         "status": "ok",
-        "allowed_origins": get_allowed_origins(),
+        "service": "Reality Check API",
+        "docs": "/docs",
+        "health": "/api/health",
     }
+
+@app.get("/api/health", tags=["meta"])
+async def health():
+    return {
+        "status": "ok",
+        "service": "Reality Check API",
+        "allowed_origins": allowed_origins_list,
+    }
+
+# --- Routers ---
+
+# /api/verify  (see app/routes/verify.py)
+app.include_router(verify_router, prefix="/api", tags=["verify"])
+
+# /api/universal-check  (see app/routes/universal_check.py)
+app.include_router(universal_router, prefix="/api", tags=["universal-check"])
 
