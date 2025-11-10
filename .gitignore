@@ -10,5 +10,5 @@ reality-check-web/.env.local
 reality-check-web/node_modules
 reality-check-web/.next
 
-# Mac / general
+# General
 .DS_Store
