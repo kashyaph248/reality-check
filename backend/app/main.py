@@ -1,75 +1,89 @@
+# app/main.py
+
+import os
+from typing import List
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes.verify import router as verify_router
-from app.routes.universal_check import router as universal_router
+from dotenv import load_dotenv
 
-# ---------------------------------------------------------
-# Initialize FastAPI App
-# ---------------------------------------------------------
+# Load environment variables (.env locally, Render env in production)
+load_dotenv()
+
+# ---- Allowed origins -------------------------------------------------------
+
+raw_origins = os.getenv("ALLOWED_ORIGINS", "")
+
+# Expected format in Render:
+# ALLOWED_ORIGINS=http://localhost:3000,https://reality-check-v1d6.vercel.app,https://reality-check-oh5g.onrender.com
+def parse_allowed_origins(value: str) -> List[str]:
+    parts = [p.strip() for p in value.split(",") if p.strip()]
+    # absolutely no "ALLOWED_ORIGINS=" prefix leakage
+    cleaned: List[str] = []
+    for p in parts:
+        if p.startswith("ALLOWED_ORIGINS="):
+            p = p.split("=", 1)[1].strip()
+        if p:
+            cleaned.append(p)
+    return cleaned
+
+
+ALLOWED_ORIGINS: List[str] = parse_allowed_origins(raw_origins)
+
+# ---- Routers ---------------------------------------------------------------
+
+from app.routes.verify import router as verify_router  # noqa: E402
+from app.routes.universal_check import router as universal_router  # noqa: E402
+
+# ---- App -------------------------------------------------------------------
+
 app = FastAPI(
     title="Reality Check API",
-    description="Backend for Reality Check — Fact Verification & Media Analysis",
-    version="1.0.0"
+    version="1.0.0",
+    description="Backend for Reality Check claim & media verification."
 )
 
-# ---------------------------------------------------------
-# Allowed Origins (Frontend + Local Dev + Backend)
-# ---------------------------------------------------------
-origins = [
-    "http://localhost:3000",
-    "https://reality-check-v1d6.vercel.app",
-    "https://reality-check-oh5g.onrender.com"
-]
-
-# ---------------------------------------------------------
-# Configure CORS Middleware
-# ---------------------------------------------------------
+# CORS for Vercel + localhost + Render backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,          # Whitelist origins
+    allow_origins=ALLOWED_ORIGINS or ["*"],
     allow_credentials=True,
-    allow_methods=["*"],            # Allow all HTTP methods (GET, POST, OPTIONS, etc.)
-    allow_headers=["*"],            # Allow all custom headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# ---------------------------------------------------------
-# Health Check Endpoint
-# ---------------------------------------------------------
-@app.get("/api/health")
-async def health_check():
-    """
-    Simple health check endpoint for debugging and Render monitoring.
-    """
-    return {
-        "status": "ok",
-        "service": "Reality Check API",
-        "allowed_origins": origins
-    }
+# Mount feature routers
+app.include_router(verify_router)
+app.include_router(universal_router)
 
-# ---------------------------------------------------------
-# Root Endpoint
-# ---------------------------------------------------------
+# ---- Health & config endpoints --------------------------------------------
+
+
 @app.get("/")
 async def root():
-    """
-    Root endpoint — helpful to confirm app deployment.
-    """
     return {
         "message": "Welcome to Reality Check API 🚀",
         "docs": "/docs",
-        "health": "/api/health"
+        "health": "/api/health",
+        "config": "/api/config",
     }
 
-# ---------------------------------------------------------
-# Include API Routers
-# ---------------------------------------------------------
-app.include_router(verify_router, prefix="/api", tags=["verify"])
-app.include_router(universal_router, prefix="/api", tags=["universal"])
 
-# ---------------------------------------------------------
-# Run Info (if run locally)
-# ---------------------------------------------------------
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+@app.get("/api/health")
+async def health():
+    return {
+        "status": "ok",
+        "service": "Reality Check API",
+        "allowed_origins": ALLOWED_ORIGINS,
+    }
+
+
+@app.get("/api/config")
+async def config():
+    # Frontend uses this to confirm it can talk to the backend
+    return {
+        "status": "ok",
+        "service": "Reality Check API",
+        "allowed_origins": ALLOWED_ORIGINS,
+    }
 
