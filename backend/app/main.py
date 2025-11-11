@@ -9,6 +9,7 @@ ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "").split(",")
 
 app = FastAPI(title="Reality Check API")
 
+# ---- CORS ----
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -17,6 +18,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ---- ROUTES ----
 @app.get("/")
 async def root():
     return {
@@ -42,4 +44,12 @@ async def config():
         "allowed_origins": ALLOWED_ORIGINS,
     }
 
+# ---- TEST ROUTES for FRONTEND ----
+@app.post("/api/verify")
+async def verify():
+    return {"message": "Verify endpoint reached", "status": "ok"}
+
+@app.post("/api/universal-check")
+async def universal_check():
+    return {"message": "Universal check endpoint reached", "status": "ok"}
 
