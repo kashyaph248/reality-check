@@ -1,30 +1,51 @@
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
 import os
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-# Load environment variables
-load_dotenv()
+# Import routers
+from app.routes.verify import router as verify_router
+from app.routes.universal_check import router as universal_router
 
-# Allowed origins (frontend + local)
+# -----------------------------------------------------------------------------
+# CORS / config
+# -----------------------------------------------------------------------------
+
+# Read comma-separated origins from env on Render:
+# ALLOWED_ORIGINS=http://localhost:3000,https://reality-check-v1d6.vercel.app,https://reality-check-oh5g.onrender.com
+ALLOWED_ORIGINS_RAW = os.getenv("ALLOWED_ORIGINS", "")
 ALLOWED_ORIGINS = [
-    o.strip()
-    for o in os.getenv("ALLOWED_ORIGINS", "").split(",")
-    if o.strip()
+    origin.strip()
+    for origin in ALLOWED_ORIGINS_RAW.split(",")
+    if origin.strip()
 ]
 
-app = FastAPI(title="Reality Check API")
+app = FastAPI(
+    title="Reality Check API",
+    version="1.0.0",
+    description="Backend for Reality Check fact-checking UI.",
+)
 
-# -------------- CORS --------------
+# Log what we picked up (helpful on Render)
+print("=== Loaded ALLOWED_ORIGINS ===", ALLOWED_ORIGINS or "[none set]")
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS or ["*"],
+    allow_origins=ALLOWED_ORIGINS or [
+        # Fallbacks (only used if env isn't set correctly)
+        "http://localhost:3000",
+        "https://reality-check-v1d6.vercel.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# -------------- BASIC ROUTES --------------
+# -----------------------------------------------------------------------------
+# Core endpoints
+# -----------------------------------------------------------------------------
+
+
 @app.get("/")
 async def root():
     return {
@@ -34,6 +55,7 @@ async def root():
         "config": "/api/config",
     }
 
+
 @app.get("/api/health")
 async def health():
     return {
@@ -42,45 +64,27 @@ async def health():
         "allowed_origins": ALLOWED_ORIGINS,
     }
 
+
 @app.get("/api/config")
 async def config():
+    """
+    Simple config endpoint the frontend can call to confirm connectivity
+    and see which origins are allowed.
+    """
     return {
         "status": "ok",
         "service": "Reality Check API",
         "allowed_origins": ALLOWED_ORIGINS,
     }
 
-# -------------- VERIFY + UNIVERSAL CHECK --------------
-@app.api_route("/api/verify", methods=["GET", "POST", "OPTIONS"])
-async def verify(request: Request):
-    """
-    Accepts both GET and POST.
-    Reads any JSON payload from frontend and echoes it back.
-    """
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
 
-    return {
-        "status": "ok",
-        "endpoint": "verify",
-        "received": data,
-        "note": "Verify route is alive and accepting requests ✅",
-    }
+# -----------------------------------------------------------------------------
+# Routers
+# -----------------------------------------------------------------------------
 
-
-@app.api_route("/api/universal-check", methods=["GET", "POST", "OPTIONS"])
-async def universal_check(request: Request):
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    return {
-        "status": "ok",
-        "endpoint": "universal-check",
-        "received": data,
-        "note": "Universal Check route is alive and accepting requests ✅",
-    }
+# These expect:
+# - POST /api/verify
+# - POST /api/universal-check
+app.include_router(verify_router, prefix="/api", tags=["verify"])
+app.include_router(universal_router, prefix="/api", tags=["universal-check"])
 
