@@ -1,50 +1,68 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes.verify import router as verify_router
-from app.routes.universal_check import router as universal_router
-import os
+from dotenv import load_dotenv
 
-# ✅ Create FastAPI app
+# Load environment variables (works locally; on Render they come from dashboard)
+load_dotenv()
+
+# Read allowed origins from env, or fall back to local + Vercel
+ALLOWED_ORIGINS_ENV = os.getenv("ALLOWED_ORIGINS", "")
+if ALLOWED_ORIGINS_ENV:
+    ALLOWED_ORIGINS = [
+        o.strip() for o in ALLOWED_ORIGINS_ENV.split(",") if o.strip()
+    ]
+else:
+    ALLOWED_ORIGINS = [
+        "http://localhost:3000",
+        "https://reality-check-v1d6.vercel.app",
+    ]
+
 app = FastAPI(
     title="Reality Check API",
-    description="Backend API for AI-assisted fact verification and media analysis",
-    version="1.0.0"
+    version="1.0.0",
 )
 
-# ✅ Allowed origins (frontend + local dev)
-origins = [
-    "http://localhost:3000",
-    "https://reality-check-v1d6.vercel.app"
-]
-
-# ✅ Apply CORS middleware
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ✅ Include API routes
-app.include_router(verify_router, prefix="/api")
-app.include_router(universal_router, prefix="/api")
+# Import routers AFTER app is created
+from app.routes.verify import router as verify_router  # noqa: E402
+from app.routes.universal_check import router as universal_router  # noqa: E402
 
-# ✅ Health check route for Render monitoring
-@app.get("/api/health")
-async def health_check():
-    return {
-        "status": "ok",
-        "service": "Reality Check API",
-        "allowed_origins": origins
-    }
+# Mount routes under /api
+app.include_router(verify_router, prefix="/api", tags=["verify"])
+app.include_router(universal_router, prefix="/api", tags=["universal"])
 
-# ✅ Root route (optional)
+
 @app.get("/")
 async def root():
     return {
         "message": "Welcome to Reality Check API 🚀",
         "docs": "/docs",
-        "health": "/api/health"
+        "health": "/api/health",
+    }
+
+
+@app.get("/api/health")
+async def health():
+    return {"status": "ok"}
+
+
+@app.get("/api/config")
+async def config():
+    """
+    Used by the frontend to confirm connectivity & see CORS config.
+    """
+    return {
+        "status": "ok",
+        "service": "Reality Check API",
+        "allowed_origins": ALLOWED_ORIGINS,
     }
 
