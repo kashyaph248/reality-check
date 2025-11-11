@@ -3,22 +3,31 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 
+# Load environment variables
 load_dotenv()
 
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "").split(",")
+# Comma-separated list in Render/Vercel:
+# ALLOWED_ORIGINS=http://localhost:3000,https://reality-check-v1d6.vercel.app
+ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.getenv("ALLOWED_ORIGINS", "").split(",")
+    if o.strip()
+]
 
 app = FastAPI(title="Reality Check API")
 
-# ---- CORS ----
+
+# ---------------- CORS ----------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=ALLOWED_ORIGINS or ["*"],  # fallback for debugging
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["*"],                     # allow GET/POST/OPTIONS etc
     allow_headers=["*"],
 )
 
-# ---- ROUTES ----
+
+# ---------------- ROOT & HEALTH ----------------
 @app.get("/")
 async def root():
     return {
@@ -28,6 +37,7 @@ async def root():
         "config": "/api/config",
     }
 
+
 @app.get("/api/health")
 async def health():
     return {
@@ -35,6 +45,7 @@ async def health():
         "service": "Reality Check API",
         "allowed_origins": ALLOWED_ORIGINS,
     }
+
 
 @app.get("/api/config")
 async def config():
@@ -44,12 +55,45 @@ async def config():
         "allowed_origins": ALLOWED_ORIGINS,
     }
 
-# ---- TEST ROUTES for FRONTEND ----
-@app.post("/api/verify")
-async def verify():
-    return {"message": "Verify endpoint reached", "status": "ok"}
 
-@app.post("/api/universal-check")
-async def universal_check():
-    return {"message": "Universal check endpoint reached", "status": "ok"}
+# ---------------- VERIFY (Quick Check) ----------------
+# Accept BOTH GET and POST so browser tests & frontend both work.
+from fastapi import Body
+
+@app.api_route("/api/verify", methods=["GET", "POST", "OPTIONS"])
+async def verify_endpoint(
+    claim: str = Body("", embed=True),
+    url: str = Body("", embed=True),
+):
+    """
+    Temporary implementation:
+    - GET: simple 'ok' so you can hit it in the browser.
+    - POST: echo back that backend is wired.
+    Frontend should use POST.
+    """
+    # If it's a preflight OPTIONS, CORSMiddleware will handle it before here.
+    return {
+        "status": "ok",
+        "endpoint": "verify",
+        "received": {
+            "claim": claim,
+            "url": url,
+        },
+    }
+
+
+# ---------------- UNIVERSAL CHECK (Deep/Universal) ----------------
+@app.api_route("/api/universal-check", methods=["GET", "POST", "OPTIONS"])
+async def universal_check_endpoint(
+    claim: str = Body("", embed=True),
+    url: str = Body("", embed=True),
+):
+    return {
+        "status": "ok",
+        "endpoint": "universal-check",
+        "received": {
+            "claim": claim,
+            "url": url,
+        },
+    }
 
