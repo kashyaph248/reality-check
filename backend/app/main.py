@@ -1,24 +1,14 @@
-import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+import os
 
-# Load env vars locally; on Render they come from dashboard
 load_dotenv()
 
-# Allowed origins from env or sensible defaults
-ALLOWED_ORIGINS_ENV = os.getenv("ALLOWED_ORIGINS", "")
-if ALLOWED_ORIGINS_ENV:
-    ALLOWED_ORIGINS = [o.strip() for o in ALLOWED_ORIGINS_ENV.split(",") if o.strip()]
-else:
-    ALLOWED_ORIGINS = [
-        "http://localhost:3000",
-        "https://reality-check-v1d6.vercel.app",
-    ]
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "").split(",")
 
-app = FastAPI(title="Reality Check API", version="1.0.0")
+app = FastAPI(title="Reality Check API")
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -26,14 +16,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Routers
-from app.routes.verify import router as verify_router
-from app.routes.universal_check import router as universal_router
-
-app.include_router(verify_router, prefix="/api", tags=["verify"])
-app.include_router(universal_router, prefix="/api", tags=["universal"])
-
 
 @app.get("/")
 async def root():
@@ -44,7 +26,6 @@ async def root():
         "config": "/api/config",
     }
 
-
 @app.get("/api/health")
 async def health():
     return {
@@ -53,7 +34,6 @@ async def health():
         "allowed_origins": ALLOWED_ORIGINS,
     }
 
-
 @app.get("/api/config")
 async def config():
     return {
@@ -61,4 +41,5 @@ async def config():
         "service": "Reality Check API",
         "allowed_origins": ALLOWED_ORIGINS,
     }
+
 
