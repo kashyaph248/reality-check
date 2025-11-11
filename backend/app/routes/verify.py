@@ -15,6 +15,10 @@ class VerifyRequest(BaseModel):
 
 @router.post("/verify")
 async def verify(payload: VerifyRequest):
+    """
+    Quick claim check.
+    Final URL (after main.py prefix): POST /api/verify
+    """
     if not payload.claim and not payload.url:
         raise HTTPException(status_code=400, detail="No claim or URL provided")
 

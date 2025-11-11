@@ -23,6 +23,10 @@ async def universal_check(
     url: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
 ):
+    """
+    Deep / universal check endpoint.
+    Final URL (after main.py prefix): POST /api/universal-check
+    """
     if not claim and not url and not file:
         raise HTTPException(status_code=400, detail="No input provided")
 
