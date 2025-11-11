@@ -3,10 +3,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-# Load environment variables (works locally; on Render vars come from dashboard)
+# Load env vars locally; on Render they come from dashboard
 load_dotenv()
 
-# Read allowed origins from env; fallback to local + Vercel
+# Allowed origins from env or sensible defaults
 ALLOWED_ORIGINS_ENV = os.getenv("ALLOWED_ORIGINS", "")
 if ALLOWED_ORIGINS_ENV:
     ALLOWED_ORIGINS = [o.strip() for o in ALLOWED_ORIGINS_ENV.split(",") if o.strip()]
@@ -47,7 +47,11 @@ async def root():
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "service": "Reality Check API",
+        "allowed_origins": ALLOWED_ORIGINS,
+    }
 
 
 @app.get("/api/config")
