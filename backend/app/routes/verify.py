@@ -1,8 +1,9 @@
 # app/routes/verify.py
 
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import inspect
+import json
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, HttpUrl
 
@@ -16,58 +17,93 @@ class VerifyPayload(BaseModel):
     url: Optional[HttpUrl] = None
 
 
+ALT_CLAIM_KEYS = ("claim", "text", "input", "message", "query", "prompt")
+ALT_URL_KEYS = ("url", "link")
+
+
 async def extract_payload(request: Request) -> VerifyPayload:
     """
-    Accepts claim/url from:
-    - JSON: { "claim": "...", "url": "..." }
-    - JSON: { "text" | "input" | "message" | "query": "..." }
-    - JSON: { "link": "..." }
-    - Query params: ?claim=...&url=...
-    - Form-data / x-www-form-urlencoded with same keys
+    Try very hard to figure out what the frontend sent.
+    Supports:
+      - JSON dict with many possible keys
+      - JSON string
+      - JSON list (joined)
+      - form-data / urlencoded
+      - raw text body
+      - query parameters
     """
     claim: Optional[str] = None
     url: Optional[str] = None
 
-    # Try JSON body
-    data = {}
-    try:
-        body = await request.json()
-        if isinstance(body, dict):
-            data = body
-    except Exception:
-        body = None  # Not JSON, ignore
+    # 1) Raw body (we'll reuse this for both JSON and text)
+    body_bytes = await request.body()
+    body_text = body_bytes.decode("utf-8", errors="ignore").strip() if body_bytes else ""
 
-    # If still empty, try form/multipart
+    data: Dict[str, Any] = {}
+
+    # 2) Try JSON first
+    if body_text:
+        try:
+            parsed = json.loads(body_text)
+        except Exception:
+            parsed = None
+
+        if isinstance(parsed, dict):
+            data = parsed
+        elif isinstance(parsed, str):
+            # Body is just a JSON string => treat as claim
+            claim = parsed.strip()
+        elif isinstance(parsed, list):
+            # Join list items into one claim
+            joined = " ".join(str(x) for x in parsed).strip()
+            if joined:
+                claim = joined
+
+    # 3) If not JSON dict, try form / urlencoded
     if not data:
         ctype = request.headers.get("content-type", "")
         if "application/x-www-form-urlencoded" in ctype or "multipart/form-data" in ctype:
-            form = await request.form()
-            data = dict(form)
+            try:
+                form = await request.form()
+                data = dict(form)
+            except Exception:
+                pass
 
-    # Map common keys
+    # 4) Pull from dict-style body (JSON or form)
     if data:
-        claim = (
-            data.get("claim")
-            or data.get("text")
-            or data.get("input")
-            or data.get("message")
-            or data.get("query")
-        )
-        url = data.get("url") or data.get("link")
+        # Claim-like fields
+        for key in ALT_CLAIM_KEYS:
+            if key in data and isinstance(data[key], (str, int, float)):
+                val = str(data[key]).strip()
+                if val:
+                    claim = val
+                    break
 
-    # Fall back to query params
+        # URL-like fields
+        for key in ALT_URL_KEYS:
+            if key in data and isinstance(data[key], str):
+                val = data[key].strip()
+                if val:
+                    url = val
+                    break
+
+    # 5) If still missing, use query params
     qp = request.query_params
     if not claim:
-        claim = qp.get("claim")
+        qp_claim = qp.get("claim") or qp.get("q") or qp.get("text")
+        if qp_claim:
+            claim = qp_claim.strip()
     if not url:
-        url = qp.get("url")
+        qp_url = qp.get("url") or qp.get("link")
+        if qp_url:
+            url = qp_url.strip()
 
-    if claim:
-        claim = str(claim).strip()
-    if url:
-        url = str(url).strip()
+    # 6) If STILL no claim but we had raw text body, treat raw as claim
+    if not claim and body_text and not data:
+        claim = body_text
 
     if not claim and not url:
+        # This is the only case where we 400.
         raise HTTPException(
             status_code=400,
             detail="Either 'claim' or 'url' must be provided.",
@@ -78,7 +114,7 @@ async def extract_payload(request: Request) -> VerifyPayload:
 
 async def run_analyzer(claim: Optional[str], url: Optional[str]):
     """
-    Call analyzer safely; supports sync or async implementations.
+    Call analyze_claim in a way that works whether it's sync or async.
     """
     try:
         result = analyze_claim(claim=claim, url=url)
@@ -88,6 +124,7 @@ async def run_analyzer(claim: Optional[str], url: Optional[str]):
     except HTTPException:
         raise
     except Exception as e:
+        # Surface as 500 so you can see real error in Render logs
         raise HTTPException(
             status_code=500,
             detail=f"Error talking to analysis engine: {e}",
@@ -97,28 +134,32 @@ async def run_analyzer(claim: Optional[str], url: Optional[str]):
 @router.post("/verify")
 async def verify(request: Request):
     """
-    Universal verify endpoint used by Quick Claim Check.
+    Quick Claim Check endpoint.
 
-    Example JSON:
-    {
-      "claim": "The earth is flat"
-    }
+    Accepts many shapes. Recommended:
+      POST /verify
+      { "claim": "The earth is flat" }
     """
     payload = await extract_payload(request)
     result = await run_analyzer(
         claim=payload.claim,
         url=str(payload.url) if payload.url else None,
     )
-    return {"input": payload.dict(), "result": result}
+    return {
+        "ok": True,
+        "input": payload.dict(),
+        "result": result,
+    }
 
 
 @router.get("/verify")
 async def verify_info():
     """
-    Simple info for GET /verify
+    Info endpoint for GET /verify.
     """
     return {
-        "message": "Use POST /verify with JSON body including 'claim' and/or 'url'.",
+        "message": "Use POST /verify with 'claim' and/or 'url' in the body.",
+        "accepted_keys": list(ALT_CLAIM_KEYS) + list(ALT_URL_KEYS),
         "example": {"claim": "The earth is flat"},
     }
 

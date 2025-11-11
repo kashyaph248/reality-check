@@ -7,14 +7,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-# Load .env / Render env
+# Load environment variables (.env locally, real env on Render)
 load_dotenv()
 
 
 def parse_allowed_origins(raw: str) -> List[str]:
     """
     Turn comma-separated ALLOWED_ORIGINS string into a clean list.
-    Handles accidental 'ALLOWED_ORIGINS=' prefix too.
+    Also handles accidental 'ALLOWED_ORIGINS=' prefix from misconfigured env.
     """
     parts = [p.strip() for p in raw.split(",") if p.strip()]
     cleaned: List[str] = []
@@ -29,13 +29,15 @@ def parse_allowed_origins(raw: str) -> List[str]:
 ALLOWED_ORIGINS = parse_allowed_origins(
     os.getenv(
         "ALLOWED_ORIGINS",
-        "http://localhost:3000,"
-        "https://reality-check-v1d6.vercel.app,"
-        "https://reality-check-oh5g.onrender.com",
+        (
+            "http://localhost:3000,"
+            "https://reality-check-v1d6.vercel.app,"
+            "https://reality-check-oh5g.onrender.com"
+        ),
     )
 )
 
-# Import routers AFTER env + settings
+# Import routers after env is loaded
 from app.routes.verify import router as verify_router  # noqa: E402
 from app.routes.universal_check import router as universal_router  # noqa: E402
 
@@ -45,7 +47,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS: allow our frontends
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -54,8 +56,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount routes (no extra /api prefix here so paths are:
-# /verify, /universal-check, etc., matching your frontend)
+# Routes (no extra /api prefix; frontend uses /verify and /universal-check)
 app.include_router(verify_router)
 app.include_router(universal_router)
 
