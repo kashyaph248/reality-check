@@ -15,9 +15,6 @@ class VerifyRequest(BaseModel):
 
 @router.post("/verify")
 async def verify(payload: VerifyRequest):
-    """
-    Quick factual check for text or a URL.
-    """
     if not payload.claim and not payload.url:
         raise HTTPException(status_code=400, detail="No claim or URL provided")
 

@@ -23,15 +23,9 @@ async def universal_check(
     url: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
 ):
-    """
-    Deep / universal check for claims, URLs, and optional uploaded media.
-    - Uses search + LLM for reasoning.
-    - Uses media analysis (stub) for basic AI/forensics flags.
-    """
     if not claim and not url and not file:
         raise HTTPException(status_code=400, detail="No input provided")
 
-    # 1) Web search if URL provided
     search_results: List[dict] = []
     if url:
         try:
@@ -39,7 +33,6 @@ async def universal_check(
         except Exception as e:
             print("Search error:", e)
 
-    # 2) Media analysis (stubbed, but wired)
     media_flags: List[str] = []
     if file is not None:
         try:
@@ -49,7 +42,6 @@ async def universal_check(
             print("Media analysis error:", e)
             media_flags = ["media_analysis_failed"]
 
-    # 3) Claim / text analysis
     text = claim or url or ""
     try:
         analysis = await analyze_claim(text, search_results)

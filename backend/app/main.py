@@ -15,8 +15,8 @@ def get_allowed_origins() -> list[str]:
 
 app = FastAPI(title="Reality Check API")
 
-# CORS
 allowed_origins = get_allowed_origins()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -45,7 +45,13 @@ async def health():
     }
 
 
-# IMPORTANT: All API routes live under /api
-app.include_router(verify_router, prefix="/api", tags=["verify"])
-app.include_router(universal_router, prefix="/api", tags=["universal"])
+# Mount routes at BOTH / and /api so frontend can't miss
+
+# e.g. POST /verify and POST /api/verify will both work
+app.include_router(verify_router, prefix="")
+app.include_router(verify_router, prefix="/api")
+
+# e.g. POST /universal-check and POST /api/universal-check will both work
+app.include_router(universal_router, prefix="")
+app.include_router(universal_router, prefix="/api")
 
