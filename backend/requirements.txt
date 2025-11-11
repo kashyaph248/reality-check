@@ -6,3 +6,4 @@ httpx
 opencv-python-headless
 python-multipart
 filetype
+aiofiles
