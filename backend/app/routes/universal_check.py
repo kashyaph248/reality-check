@@ -324,6 +324,7 @@ def save_upload(file: UploadFile) -> tuple[Path, Literal["image", "video"]]:
 
 
 @router.get("/universal-check")
+@router.get("/api/universal-check")
 async def universal_check_info() -> Dict[str, Any]:
     """
     Lightweight GET endpoint used by the frontend to confirm the route exists.
@@ -335,6 +336,7 @@ async def universal_check_info() -> Dict[str, Any]:
 
 
 @router.post("/universal-check")
+@router.post("/api/universal-check")
 async def universal_check(
     claim: Optional[str] = Form(None),
     url: Optional[str] = Form(None),
