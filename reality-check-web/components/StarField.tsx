@@ -57,7 +57,7 @@ export default function StarField() {
     <canvas
       ref={canvasRef}
       className="fixed inset-0 -z-10"
-      style={{ background: "#020617" }} // dark navy-ish
+      style={{ background: "#020617" }}
     />
   );
 }
