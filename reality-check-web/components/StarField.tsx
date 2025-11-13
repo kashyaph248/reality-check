@@ -13,6 +13,7 @@ export default function StarField() {
     if (!ctx) return;
 
     function resize() {
+      if (!canvas) return;
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     }
@@ -29,7 +30,7 @@ export default function StarField() {
     }));
 
     function animate() {
-      if (!ctx || !canvas) return;
+      if (!canvas || !ctx) return;
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
