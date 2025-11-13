@@ -28,6 +28,7 @@ class VerifyRequest(BaseModel):
 
 
 @router.get("/verify")
+@router.get("/api/verify")
 async def verify_info():
     """
     Simple info endpoint so GET /verify works (used by docs / health checks).
@@ -36,6 +37,7 @@ async def verify_info():
 
 
 @router.post("/verify")
+@router.post("/api/verify")
 async def verify(request: VerifyRequest):
     """
     Quick Claim Check endpoint.
