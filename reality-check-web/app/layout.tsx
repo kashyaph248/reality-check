@@ -1,4 +1,4 @@
-kimport type { Metadata } from "next";
+import type { Metadata } from "next";
 import "./globals.css";
 import StarField from "@/components/StarField";
 
@@ -15,7 +15,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-[#020617] text-white">
+        {/* Starry animated background behind everything */}
         <StarField />
+
+        {/* All pages sit above the stars */}
         <div className="relative z-10 min-h-screen flex flex-col">
           {children}
         </div>
