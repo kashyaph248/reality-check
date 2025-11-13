@@ -4,7 +4,7 @@ import StarField from "@/components/StarField";
 
 export const metadata: Metadata = {
   title: "Reality Check AI",
-  description: "AI-powered lie detector for news, photos, and videos.",
+  description: "AI-powered truth detection for claims, news, images and video.",
 };
 
 export default function RootLayout({
@@ -15,15 +15,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-[#020617] text-white">
-        {/* Starfield background behind everything */}
+        {/* Starry animated background */}
         <StarField />
 
-        {/* All your existing pages sit above the stars */}
-        <div className="relative z-10 min-h-screen">
+        {/* Main content sits above the stars */}
+        <div className="relative z-10 min-h-screen flex flex-col">
           {children}
         </div>
       </body>
     </html>
   );
 }
+
 
