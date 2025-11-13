@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import StarField from "@/components/StarField";
+import NebulaGlow from "@/components/NebulaGlow";
 
 export const metadata: Metadata = {
   title: "Reality Check AI",
@@ -14,11 +15,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-[#020617] text-white">
-        {/* Starry animated background behind everything */}
+      <body className="bg-[#020617] text-white antialiased">
+        {/* Background layers */}
         <StarField />
+        <NebulaGlow />
 
-        {/* All pages sit above the stars */}
+        {/* App content */}
         <div className="relative z-10 min-h-screen flex flex-col">
           {children}
         </div>
