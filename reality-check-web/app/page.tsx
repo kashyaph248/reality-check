@@ -28,7 +28,7 @@ type CheckResult = {
 };
 
 // injected at build time; on client it's just a string literal
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "";
+const API_BASE = "https://reality-check-oh5g.onrender.com";
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<Tab>("quick");
