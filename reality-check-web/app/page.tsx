@@ -13,6 +13,8 @@ import {
   AlertTriangle,
   HelpCircle,
   Link2,
+  UploadCloud,
+  XCircle,
 } from "lucide-react";
 
 type Tab = "quick" | "deep";
@@ -25,14 +27,24 @@ type CheckResult = {
   url?: string | null;
 };
 
+// injected at build time; on client it's just a string literal
+const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "";
+
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<Tab>("quick");
   const [claim, setClaim] = useState("");
   const [url, setUrl] = useState("");
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+
   const [result, setResult] = useState<CheckResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isDarkCard, setIsDarkCard] = useState(true);
+
+  const canRunQuick = !!claim.trim();
+  const canRunDeep = !!claim.trim() || !!url.trim() || !!mediaFile;
+  const isDisabled =
+    isLoading || (activeTab === "quick" ? !canRunQuick : !canRunDeep);
 
   async function handleRunCheck() {
     setIsLoading(true);
@@ -40,20 +52,41 @@ export default function HomePage() {
     setResult(null);
 
     try {
-      const endpoint =
+      const endpointPath =
         activeTab === "quick" ? "/verify" : "/universal-check";
+      const endpoint = `${API_BASE}${endpointPath}`;
 
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(
+      let res: Response;
+
+      if (activeTab === "deep" && mediaFile) {
+        // multipart request when media is attached
+        const form = new FormData();
+        if (claim.trim()) form.append("claim", claim.trim());
+        if (url.trim()) form.append("url", url.trim());
+        form.append("media", mediaFile);
+
+        res = await fetch(endpoint, {
+          method: "POST",
+          body: form,
+        });
+      } else {
+        // JSON-only request
+        const body =
           activeTab === "quick"
-            ? { claim }
-            : { claim: claim || undefined, url: url || undefined },
-        ),
-      });
+            ? { claim: claim.trim() }
+            : {
+                claim: claim.trim() || undefined,
+                url: url.trim() || undefined,
+              };
+
+        res = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+      }
 
       if (!res.ok) {
         const text = await res.text();
@@ -74,7 +107,12 @@ export default function HomePage() {
 
   const verdictStyle = useMemo(() => {
     const v = (result?.verdict || "").toLowerCase();
-    if (!v) return { label: "Unknown", color: "bg-slate-700/70", text: "text-slate-100" };
+    if (!v)
+      return {
+        label: "Unknown",
+        color: "bg-slate-700/70",
+        text: "text-slate-100",
+      };
 
     if (["true", "accurate", "supported"].includes(v)) {
       return {
@@ -105,7 +143,8 @@ export default function HomePage() {
   }, [result?.verdict]);
 
   const confidencePct = useMemo(() => {
-    if (result?.confidence === undefined || result.confidence === null) return null;
+    if (result?.confidence === undefined || result.confidence === null)
+      return null;
     const raw = Number(result.confidence);
     if (Number.isNaN(raw)) return null;
     return Math.round(Math.min(Math.max(raw, 0), 1) * 100);
@@ -114,12 +153,12 @@ export default function HomePage() {
   const cardBase =
     "w-full max-w-4xl rounded-3xl p-6 md:p-8 shadow-[0_18px_60px_rgba(15,23,42,0.95)] border backdrop-blur-xl transition-colors duration-300";
   const cardVariant = isDarkCard
-    ? "bg-slate-950/85 border-white/10"
+    ? "bg-slate-950/85 border-white/10 text-slate-50"
     : "bg-slate-100/90 border-slate-300 text-slate-900";
 
   return (
     <div className="flex flex-col min-h-screen items-center px-4 pt-20 pb-10">
-      {/* Top bar with tiny brand + theme toggle */}
+      {/* Top bar */}
       <div className="w-full max-w-5xl flex items-center justify-between gap-4 mb-4">
         <motion.div
           initial={{ opacity: 0, y: -12 }}
@@ -219,7 +258,7 @@ export default function HomePage() {
             <span>
               {activeTab === "quick"
                 ? "Fast single-claim screening."
-                : "Heavier multi-signal investigation."}
+                : "Heavier check with URL + media support."}
             </span>
           </div>
         </div>
@@ -244,28 +283,86 @@ export default function HomePage() {
           </div>
 
           {activeTab === "deep" && (
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
-                Optional URL (article / video)
-              </label>
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-500">
-                    <Link2 className="w-3.5 h-3.5" />
+            <>
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Optional URL (article / video)
+                </label>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-500">
+                      <Link2 className="w-3.5 h-3.5" />
+                    </div>
+                    <input
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      className={`w-full rounded-2xl pl-8 pr-3 py-2 text-sm md:text-[15px] focus:outline-none focus:ring-2 focus:ring-violet-500/80 border ${
+                        isDarkCard
+                          ? "bg-slate-900/80 border-white/10 text-slate-50 placeholder:text-slate-500"
+                          : "bg-white border-slate-300 text-slate-900 placeholder:text-slate-400"
+                      }`}
+                      placeholder="https://example.com/suspicious-article"
+                    />
                   </div>
+                </div>
+              </div>
+
+              {/* MEDIA UPLOAD */}
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Optional image / video file
+                </label>
+                <div
+                  className={`flex items-center justify-between gap-3 rounded-2xl border px-3 py-2 text-xs cursor-pointer transition ${
+                    isDarkCard
+                      ? "border-dashed border-slate-600/70 bg-slate-900/70 hover:border-violet-400/70 hover:bg-slate-900/90"
+                      : "border-dashed border-slate-300 bg-slate-100 hover:border-violet-400 hover:bg-slate-50"
+                  }`}
+                  onClick={() => {
+                    const input = document.getElementById(
+                      "media-input",
+                    ) as HTMLInputElement | null;
+                    input?.click();
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <UploadCloud className="w-4 h-4 text-sky-300" />
+                    {mediaFile ? (
+                      <span className="truncate max-w-[180px]">
+                        {mediaFile.name}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">
+                        Drop or click to attach an image or video (optional)
+                      </span>
+                    )}
+                  </div>
+                  {mediaFile && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMediaFile(null);
+                      }}
+                      className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-rose-300"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      Clear
+                    </button>
+                  )}
                   <input
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    className={`w-full rounded-2xl pl-8 pr-3 py-2 text-sm md:text-[15px] focus:outline-none focus:ring-2 focus:ring-violet-500/80 border ${
-                      isDarkCard
-                        ? "bg-slate-900/80 border-white/10 text-slate-50 placeholder:text-slate-500"
-                        : "bg-white border-slate-300 text-slate-900 placeholder:text-slate-400"
-                    }`}
-                    placeholder="https://example.com/suspicious-article"
+                    id="media-input"
+                    type="file"
+                    accept="image/*,video/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      setMediaFile(file);
+                    }}
                   />
                 </div>
               </div>
-            </div>
+            </>
           )}
         </div>
 
@@ -274,16 +371,14 @@ export default function HomePage() {
           <div className="flex items-center gap-2 text-[11px] text-slate-400">
             <Sparkles className="w-3 h-3 text-blue-300" />
             <span>
-              Your text is sent only to the Reality Check backend + OpenAI for
-              analysis.
+              Your text and media are sent only to the Reality Check backend +
+              OpenAI for analysis. No public sharing.
             </span>
           </div>
 
           <button
             onClick={handleRunCheck}
-            disabled={
-              isLoading || (!claim && activeTab === "quick")
-            }
+            disabled={isDisabled}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-blue-500 via-sky-400 to-violet-500 text-sm font-semibold shadow-[0_0_25px_rgba(56,189,248,0.75)] hover:shadow-[0_0_40px_rgba(124,58,237,0.9)] transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
           >
             {isLoading ? (
