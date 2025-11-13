@@ -21,17 +21,7 @@ type MediaResult = {
   explanation?: string;
 };
 
-// Predefined star positions so they don't jump around
-const STARS = [
-  { top: "10%", left: "15%", size: 2, delay: "0s" },
-  { top: "20%", left: "70%", size: 3, delay: "0.6s" },
-  { top: "30%", left: "40%", size: 2, delay: "1.2s" },
-  { top: "45%", left: "80%", size: 2, delay: "0.9s" },
-  { top: "55%", left: "20%", size: 3, delay: "1.5s" },
-  { top: "65%", left: "60%", size: 2, delay: "0.3s" },
-  { top: "75%", left: "35%", size: 2, delay: "1.8s" },
-  { top: "85%", left: "10%", size: 3, delay: "1.1s" },
-];
+const STAR_COUNT = 120;
 
 export default function HomePage() {
   const [mode, setMode] = useState<Mode>("claim");
@@ -42,6 +32,18 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ClaimResult | MediaResult | null>(null);
+
+  // Generate stars once on first render so they don't move around
+  const [stars] = useState(() =>
+    Array.from({ length: STAR_COUNT }).map((_, i) => ({
+      id: i,
+      top: `${Math.random() * 100}%`,
+      left: `${Math.random() * 100}%`,
+      size: Math.random() < 0.7 ? 1.5 : 2.5,
+      delay: `${Math.random() * 4}s`,
+      duration: `${2 + Math.random() * 3}s`,
+    }))
+  );
 
   const handleModeChange = (newMode: Mode) => {
     setMode(newMode);
@@ -102,8 +104,7 @@ export default function HomePage() {
         }
 
         const formData = new FormData();
-        // Field name must match the FastAPI parameter: `media: UploadFile = File(...)`
-        formData.append("media", file);
+        formData.append("media", file); // must match FastAPI param name
 
         const response = await fetch(`${BACKEND_URL}/api/universal-check`, {
           method: "POST",
@@ -188,7 +189,7 @@ export default function HomePage() {
         {sources && Array.isArray(sources) && sources.length > 0 && (
           <div className="mt-4 space-y-2">
             <p className="text-xs font-medium text-slate-400">
-              Evidence & sources:
+              Evidence &amp; sources:
             </p>
             <ul className="space-y-1 text-sm">
               {sources.map((src, idx) => (
@@ -212,23 +213,28 @@ export default function HomePage() {
 
   return (
     <div className="relative min-h-screen bg-slate-950 text-slate-50 overflow-hidden">
-      {/* Gradient + Starfield Background */}
-      <div className="pointer-events-none fixed inset-0 -z-20 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950" />
-      <div className="pointer-events-none fixed inset-0 -z-10 opacity-70">
-        {/* Soft glow blobs */}
-        <div className="absolute -top-40 left-0 h-72 w-72 rounded-full bg-sky-500/20 blur-3xl" />
-        <div className="absolute -bottom-40 right-10 h-80 w-80 rounded-full bg-violet-500/20 blur-3xl" />
-        {/* Blinking / dimming stars */}
-        {STARS.map((star, idx) => (
+      {/* Gradient background */}
+      <div className="pointer-events-none fixed inset-0 -z-30 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950" />
+
+      {/* Glow blobs */}
+      <div className="pointer-events-none fixed inset-0 -z-20">
+        <div className="absolute -top-40 left-0 h-72 w-72 rounded-full bg-sky-500/25 blur-3xl" />
+        <div className="absolute -bottom-40 right-10 h-80 w-80 rounded-full bg-violet-500/25 blur-3xl" />
+      </div>
+
+      {/* Starfield layer */}
+      <div className="pointer-events-none fixed inset-0 -z-10">
+        {stars.map((star) => (
           <span
-            key={idx}
-            className="absolute rounded-full bg-white/80 opacity-60 animate-pulse"
+            key={star.id}
+            className="star"
             style={{
               top: star.top,
               left: star.left,
               width: star.size,
               height: star.size,
               animationDelay: star.delay,
+              animationDuration: star.duration,
             }}
           />
         ))}
@@ -408,12 +414,10 @@ export default function HomePage() {
 
               {!result && !error && (
                 <div className="mt-4 space-y-3 text-sm text-slate-300">
-                  <p>
-                    Reality Check will:
-                  </p>
+                  <p>Reality Check will:</p>
                   <ul className="list-disc space-y-1 pl-4 text-xs text-slate-400">
                     <li>Read your claim or media</li>
-                    <li>Compare with web evidence & patterns</li>
+                    <li>Compare with web evidence &amp; patterns</li>
                     <li>Give a verdict + confidence score</li>
                     <li>Explain the reasoning in plain English</li>
                   </ul>
@@ -439,6 +443,43 @@ export default function HomePage() {
           </aside>
         </div>
       </main>
+
+      {/* Starfield animation CSS */}
+      <style jsx global>{`
+        .star {
+          position: absolute;
+          border-radius: 9999px;
+          background: rgba(248, 250, 252, 0.9);
+          box-shadow: 0 0 8px rgba(148, 163, 184, 0.8);
+          opacity: 0;
+          animation-name: twinkle;
+          animation-iteration-count: infinite;
+          animation-timing-function: ease-in-out;
+        }
+
+        @keyframes twinkle {
+          0% {
+            opacity: 0.05;
+            transform: scale(1);
+          }
+          25% {
+            opacity: 0.9;
+            transform: scale(1.35);
+          }
+          50% {
+            opacity: 0.2;
+            transform: scale(0.9);
+          }
+          75% {
+            opacity: 0.7;
+            transform: scale(1.15);
+          }
+          100% {
+            opacity: 0.05;
+            transform: scale(1);
+          }
+        }
+      `}</style>
     </div>
   );
 }
